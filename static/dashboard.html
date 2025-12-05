@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Data Dashboard - Local Analytic Chatbot</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-alt: #334155;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --accent-light: #dbeafe;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --border: #475569;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { 
+      height: 100%; 
+      margin: 0; 
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+      color: var(--text-primary); 
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+      padding: 20px;
+      background: var(--surface);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      color: var(--text-primary);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #0ea5e9);
+      color: #fff;
+      box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-secondary {
+      background: var(--surface-alt);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Main Grid */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 24px;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      height: 90vh;
+      position: sticky;
+      top: 20px;
+      overflow-y: auto;
+    }
+
+    .sidebar-section {
+      margin-bottom: 24px;
+    }
+
+    .sidebar-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    /* Controls */
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .control-group label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    select, input {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(30, 41, 59, 0.5);
+      color: var(--text-primary);
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    select:hover, input:hover {
+      border-color: var(--accent);
+      background: rgba(30, 41, 59, 0.8);
+    }
+
+    select:focus, input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      background: rgba(30, 41, 59, 0.9);
+    }
+
+    /* Main Content */
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      overflow-y: auto;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0 0 16px;
+      color: var(--text-primary);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-box {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Filters */
+    .filters-section {
+      background: rgba(59, 130, 246, 0.05);
+      padding: 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(59, 130, 246, 0.1);
+      margin-bottom: 20px;
+    }
+
+    .active-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .filter-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .filter-tag button {
+      background: none;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0;
+    }
+
+    /* Data Table */
+    .table-wrapper {
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 500px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead {
+      background: rgba(59, 130, 246, 0.1);
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 11px;
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+      color: var(--text-secondary);
+    }
+
+    tr:hover {
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    /* Chart Container */
+    .chart-container {
+      position: relative;
+      height: calc(100vh - 450px);
+      min-height: 400px;
+      max-height: 600px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .chart-container canvas {
+      max-height: 100%;
+      width: 100% !important;
+    }
+
+    .chart-controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* Unique Values */
+    .unique-values-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .value-chip {
+      padding: 8px 12px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .value-chip:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .value-chip.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* Loading & Empty States */
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-muted);
+    }
+
+    .loader {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(59, 130, 246, 0.2);
+      border-top: 2px solid var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: relative;
+        top: auto;
+      }
+
+      .header {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+      }
+
+      .header-actions {
+        width: 100%;
+        flex-direction: column;
+      }
+
+      .header-actions .btn {
+        width: 100%;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.6);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Data Dashboard</h1>
+        <p id="fileName" style="margin: 4px 0 0; color: var(--text-muted); font-size: 13px;">No file loaded</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-secondary" onclick="window.location.href='/'">Back to Chat</button>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-section">
+          <h3 class="section-title">📁 Data Source</h3>
+          <div class="control-group">
+            <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Upload CSV File</label>
+            <div class="file-upload-area" id="fileUploadArea" style="
+              background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(14,165,233,0.04));
+              padding: 16px;
+              border-radius: 8px;
+              border: 2px dashed var(--border);
+              cursor: pointer;
+              transition: all 0.3s;
+              text-align: center;
+            ">
+              <input type="file" id="dashboardFileInput" accept=".csv" style="display: none;" onchange="handleFileUpload(event)">
+              <div style="font-size: 24px; margin-bottom: 8px;">📤</div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Click to upload or drag & drop</div>
+              <div style="font-size: 11px; color: var(--text-muted);">.CSV files only</div>
+            </div>
+            <div id="uploadedFileName" style="margin-top: 12px; padding: 8px; background: rgba(59,130,246,0.1); border-radius: 6px; font-size: 12px; color: var(--text-secondary); display: none;">
+              <strong>📋 File:</strong> <span id="fileNameSpan"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3 class="section-title">Visualization</h3>
+          <div class="control-group">
+            <label>Chart Type</label>
+            <select id="chartType" onchange="updateChart()">
+              <option value="bar">Bar Chart</option>
+              <option value="line">Line Chart</option>
+              <option value="pie">Pie Chart</option>
+              <option value="doughnut">Doughnut Chart</option>
+              <option value="scatter">Scatter Plot</option>
+              <option value="area">Area Chart</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label>X-Axis Column</label>
+            <select id="xAxisCol" onchange="updateChart()">
+              <option value="">Select column...</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label>Y-Axis Column</label>
+            <select id="yAxisCol" onchange="updateChart()">
+              <option value="">Select column...</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <h3 class="section-title">Filters</h3>
+          <div id="filterControls"></div>
+          <button class="btn btn-secondary" style="width: 100%; margin-top: 12px;" onclick="clearFilters()">
+            Clear Filters
+          </button>
+        </div>
+
+        <div class="sidebar-section">
+          <button class="btn btn-primary" style="width: 100%;" onclick="exportData()">Export Data</button>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="content">
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <!-- Filters Display -->
+        <div class="filters-section" id="filtersDisplay" style="display: none;">
+          <strong>Active Filters:</strong>
+          <div class="active-filters" id="activeFiltersList"></div>
+        </div>
+
+        <!-- Chart -->
+        <div class="card">
+          <h3 class="card-title">📈 Chart</h3>
+          <div class="chart-container">
+            <canvas id="mainChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Unique Values -->
+        <div class="card">
+          <h3 class="card-title">🏷️ Unique Values</h3>
+          <div class="control-group">
+            <label>Column</label>
+            <select id="uniqueCol" onchange="showUniqueValues()">
+              <option value="">Select column...</option>
+            </select>
+          </div>
+          <div id="uniqueValuesContainer" class="unique-values-grid"></div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="card">
+          <h3 class="card-title">📋 Data Preview (First 100 rows)</h3>
+          <div class="table-wrapper">
+            <table id="dataTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentData = null;
+    let filteredData = null;
+    let uploadedFiles = [];
+    let currentFilePath = '';
+    let activeFilters = {};
+    let chart = null;
+
+    // Initialize
+    async function init() {
+      setupFileUpload();
+    }
+
+    // Setup file upload
+    function setupFileUpload() {
+      const uploadArea = document.getElementById('fileUploadArea');
+      const fileInput = document.getElementById('dashboardFileInput');
+
+      uploadArea.addEventListener('click', () => fileInput.click());
+
+      uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--accent)';
+        uploadArea.style.background = 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(14,165,233,0.1))';
+      });
+
+      uploadArea.addEventListener('dragleave', () => {
+        uploadArea.style.borderColor = 'var(--border)';
+        uploadArea.style.background = 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(14,165,233,0.04))';
+      });
+
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.style.borderColor = 'var(--border)';
+        uploadArea.style.background = 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(14,165,233,0.04))';
+        
+        const files = e.dataTransfer.files;
+        if (files && files[0] && files[0].name.endsWith('.csv')) {
+          handleFileUpload({ target: { files: files } });
+        } else {
+          alert('Only CSV files allowed');
+        }
+      });
+    }
+
+    // Handle file upload
+    async function handleFileUpload(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      if (!file.name.endsWith('.csv')) {
+        alert('Only CSV files allowed');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) throw new Error('Upload failed');
+
+        const result = await response.json();
+        const filePath = result.file_path;
+
+        document.getElementById('fileNameSpan').textContent = file.name;
+        document.getElementById('uploadedFileName').style.display = 'block';
+
+        // Load the data
+        await loadFileData(filePath);
+      } catch (err) {
+        console.error('Error uploading file:', err);
+        alert('Failed to upload file: ' + err.message);
+      }
+    }
+
+    // Load file data
+    async function loadFileData(filePath) {
+      currentFilePath = filePath;
+      try {
+        const response = await fetch(`/load-data?file=${encodeURIComponent(filePath)}`);
+        if (!response.ok) throw new Error('Failed to load data');
+        
+        currentData = await response.json();
+        filteredData = JSON.parse(JSON.stringify(currentData));
+        activeFilters = {};
+        
+        document.getElementById('fileName').textContent = `File: ${filePath.split('/').pop()}`;
+        populateColumnSelects();
+        updateUI();
+      } catch (err) {
+        console.error('Error loading data:', err);
+        alert('Failed to load data: ' + err.message);
+      }
+    }
+
+    // Load list of uploaded files (removed - no longer needed)
+    async function loadFileList() {
+      // This function is no longer needed
+    }
+
+    // Load file data (old version - kept for compatibility)
+    async function loadFile() {
+      // This function is no longer needed
+    }
+
+    // Populate column dropdowns
+    function populateColumnSelects() {
+      if (!currentData || currentData.length === 0) return;
+
+      const columns = Object.keys(currentData[0]);
+      const selects = ['xAxisCol', 'yAxisCol', 'uniqueCol', 'chartType'];
+      
+      // Update axis columns
+      [document.getElementById('xAxisCol'), document.getElementById('yAxisCol'), document.getElementById('uniqueCol')].forEach(select => {
+        const val = select.value;
+        select.innerHTML = '<option value="">Select column...</option>';
+        columns.forEach(col => {
+          const opt = document.createElement('option');
+          opt.value = col;
+          opt.textContent = col;
+          select.appendChild(opt);
+        });
+        if (val && columns.includes(val)) select.value = val;
+      });
+
+      // Create filter controls
+      createFilterControls(columns);
+    }
+
+    // Create filter controls
+    function createFilterControls(columns) {
+      const container = document.getElementById('filterControls');
+      container.innerHTML = '';
+
+      columns.forEach(col => {
+        const div = document.createElement('div');
+        div.className = 'control-group';
+        
+        const label = document.createElement('label');
+        label.textContent = `Filter: ${col}`;
+        
+        const select = document.createElement('select');
+        select.onchange = () => applyFilters();
+        select.innerHTML = '<option value="">All</option>';
+        
+        // Get unique values
+        const uniqueVals = [...new Set(currentData.map(row => row[col]))].sort().slice(0, 20);
+        uniqueVals.forEach(val => {
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = val;
+          select.appendChild(opt);
+        });
+        
+        div.appendChild(label);
+        div.appendChild(select);
+        container.appendChild(div);
+      });
+    }
+
+    // Apply filters
+    function applyFilters() {
+      const columns = Object.keys(currentData[0]);
+      activeFilters = {};
+      let hasFilter = false;
+
+      columns.forEach(col => {
+        const selects = document.querySelectorAll('select');
+        for (let select of selects) {
+          if (select.parentElement?.textContent.includes(`Filter: ${col}`)) {
+            if (select.value) {
+              activeFilters[col] = select.value;
+              hasFilter = true;
+            }
+            break;
+          }
+        }
+      });
+
+      // Filter data
+      filteredData = currentData.filter(row => {
+        return Object.entries(activeFilters).every(([col, val]) => row[col] == val);
+      });
+
+      // Update display
+      document.getElementById('filtersDisplay').style.display = hasFilter ? 'block' : 'none';
+      updateFilterDisplay();
+      updateUI();
+    }
+
+    // Update filter display
+    function updateFilterDisplay() {
+      const list = document.getElementById('activeFiltersList');
+      list.innerHTML = '';
+      
+      Object.entries(activeFilters).forEach(([col, val]) => {
+        const tag = document.createElement('div');
+        tag.className = 'filter-tag';
+        tag.innerHTML = `${col} = ${val} <button onclick="removeFilter('${col}')">×</button>`;
+        list.appendChild(tag);
+      });
+    }
+
+    // Remove filter
+    function removeFilter(col) {
+      const selects = document.querySelectorAll('select');
+      for (let select of selects) {
+        if (select.parentElement?.textContent.includes(`Filter: ${col}`)) {
+          select.value = '';
+          break;
+        }
+      }
+      applyFilters();
+    }
+
+    // Clear all filters
+    function clearFilters() {
+      document.querySelectorAll('#filterControls select').forEach(s => s.value = '');
+      applyFilters();
+    }
+
+    // Update UI
+    function updateUI() {
+      updateStats();
+      updateChart();
+      updateTable();
+    }
+
+    // Update stats
+    function updateStats() {
+      const statsGrid = document.getElementById('statsGrid');
+      statsGrid.innerHTML = '';
+
+      if (!filteredData || filteredData.length === 0) {
+        statsGrid.innerHTML = '<div class="empty-state">No data available</div>';
+        return;
+      }
+
+      const columns = Object.keys(filteredData[0]);
+
+      // Total rows
+      const stat1 = document.createElement('div');
+      stat1.className = 'stat-box';
+      stat1.innerHTML = `<div class="stat-value">${filteredData.length}</div><div class="stat-label">Total Rows</div>`;
+      statsGrid.appendChild(stat1);
+
+      // Total columns
+      const stat2 = document.createElement('div');
+      stat2.className = 'stat-box';
+      stat2.innerHTML = `<div class="stat-value">${columns.length}</div><div class="stat-label">Columns</div>`;
+      statsGrid.appendChild(stat2);
+
+      // Sample values from first numeric column
+      const numCol = columns.find(c => typeof filteredData[0][c] === 'number');
+      if (numCol) {
+        const values = filteredData.map(r => parseFloat(r[numCol])).filter(v => !isNaN(v));
+        const avg = (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
+        const stat3 = document.createElement('div');
+        stat3.className = 'stat-box';
+        stat3.innerHTML = `<div class="stat-value">${avg}</div><div class="stat-label">Avg (${numCol.substring(0, 8)})</div>`;
+        statsGrid.appendChild(stat3);
+      }
+    }
+
+    // Update chart with robust data handling
+    function updateChart() {
+      if (!filteredData || filteredData.length === 0) {
+        return;
+      }
+
+      const chartType = document.getElementById('chartType').value || 'bar';
+      const xCol = document.getElementById('xAxisCol').value;
+      const yCol = document.getElementById('yAxisCol').value;
+
+      if (!xCol) {
+        console.warn('No X column selected');
+        return;
+      }
+
+      try {
+        const ctx = document.getElementById('mainChart');
+        if (!ctx) {
+          console.error('Chart canvas not found');
+          return;
+        }
+
+        const canvasContext = ctx.getContext('2d');
+        let labels = [];
+        let data = [];
+        let chartConfig = {
+          type: chartType === 'area' ? 'line' : chartType,
+          data: {
+            labels: [],
+            datasets: [{
+              label: yCol || 'Count',
+              data: [],
+              backgroundColor: '#3b82f6',
+              borderColor: '#3b82f6',
+              borderWidth: 2,
+              fill: false,
+              tension: 0.4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                labels: { 
+                  color: '#cbd5e1', 
+                  font: { size: 12 },
+                  padding: 15
+                }
+              }
+            }
+          }
+        };
+
+        // Group data by X column
+        const groupedData = {};
+        filteredData.forEach(row => {
+          const key = String(row[xCol] || 'Unknown');
+          if (!groupedData[key]) {
+            groupedData[key] = [];
+          }
+          groupedData[key].push(row);
+        });
+
+        labels = Object.keys(groupedData).slice(0, 50);
+
+        if (chartType === 'bar' || chartType === 'line' || chartType === 'area') {
+          // Calculate Y values
+          if (yCol && filteredData[0].hasOwnProperty(yCol)) {
+            data = labels.map(label => {
+              const values = groupedData[label]
+                .map(r => parseFloat(r[yCol]))
+                .filter(v => !isNaN(v));
+              return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+            });
+          } else {
+            // Just count rows
+            data = labels.map(label => groupedData[label].length);
+          }
+
+          chartConfig.data.labels = labels;
+          chartConfig.data.datasets[0].data = data;
+          chartConfig.data.datasets[0].fill = chartType === 'area';
+          
+          chartConfig.options.scales = {
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#94a3b8', font: { size: 11 } },
+              grid: { color: 'rgba(71, 85, 105, 0.2)' }
+            },
+            x: {
+              ticks: { color: '#94a3b8', font: { size: 11 } },
+              grid: { color: 'rgba(71, 85, 105, 0.2)' }
+            }
+          };
+
+        } else if (chartType === 'pie' || chartType === 'doughnut') {
+          labels = Object.keys(groupedData).slice(0, 20);
+          data = labels.map(label => groupedData[label].length);
+
+          const colors = [
+            '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+            '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#06b6d4',
+            '#a78bfa', '#fca5a5', '#86efac', '#fcd34d', '#c084fc'
+          ];
+
+          chartConfig.data.labels = labels;
+          chartConfig.data.datasets[0].data = data;
+          chartConfig.data.datasets[0].backgroundColor = colors.slice(0, labels.length);
+          chartConfig.data.datasets[0].borderColor = '#1e293b';
+
+        } else if (chartType === 'scatter') {
+          const xValues = filteredData
+            .map(r => ({ x: parseFloat(r[xCol]), y: yCol ? parseFloat(r[yCol]) : 0 }))
+            .filter(p => !isNaN(p.x) && !isNaN(p.y))
+            .slice(0, 1000);
+
+          if (xValues.length > 0) {
+            chartConfig.data.datasets[0].data = xValues;
+            chartConfig.options.scales = {
+              y: {
+                ticks: { color: '#94a3b8', font: { size: 11 } },
+                grid: { color: 'rgba(71, 85, 105, 0.2)' }
+              },
+              x: {
+                ticks: { color: '#94a3b8', font: { size: 11 } },
+                grid: { color: 'rgba(71, 85, 105, 0.2)' }
+              }
+            };
+          }
+        }
+
+        if (chart) chart.destroy();
+        chart = new Chart(canvasContext, chartConfig);
+
+      } catch (err) {
+        console.error('Chart error:', err);
+      }
+    }
+
+    // Show unique values
+    function showUniqueValues() {
+      const col = document.getElementById('uniqueCol').value;
+      const container = document.getElementById('uniqueValuesContainer');
+      
+      if (!col || !filteredData) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const uniqueVals = [...new Set(filteredData.map(r => r[col]))].sort().slice(0, 50);
+      
+      container.innerHTML = uniqueVals.map(val => 
+        `<div class="value-chip" onclick="filterByValue('${col}', '${val}')">${val}</div>`
+      ).join('');
+    }
+
+    // Filter by clicking unique value
+    function filterByValue(col, val) {
+      const selects = document.querySelectorAll('select');
+      for (let select of selects) {
+        if (select.parentElement?.textContent.includes(`Filter: ${col}`)) {
+          select.value = val;
+          break;
+        }
+      }
+      applyFilters();
+    }
+
+    // Update table
+    function updateTable() {
+      const table = document.getElementById('dataTable');
+      const thead = table.querySelector('thead');
+      const tbody = table.querySelector('tbody');
+
+      if (!filteredData || filteredData.length === 0) {
+        thead.innerHTML = '';
+        tbody.innerHTML = '<tr><td colspan="100%">No data</td></tr>';
+        return;
+      }
+
+      const columns = Object.keys(filteredData[0]);
+
+      // Header
+      thead.innerHTML = '<tr>' + columns.map(col => `<th>${col}</th>`).join('') + '</tr>';
+
+      // Body
+      tbody.innerHTML = filteredData.slice(0, 100).map(row =>
+        '<tr>' + columns.map(col => `<td>${row[col] !== null && row[col] !== undefined ? row[col] : '—'}</td>`).join('') + '</tr>'
+      ).join('');
+    }
+
+    // Export data
+    function exportData() {
+      if (!filteredData || filteredData.length === 0) {
+        alert('No data to export');
+        return;
+      }
+
+      const csv = [
+        Object.keys(filteredData[0]).join(','),
+        ...filteredData.map(row => 
+          Object.values(row).map(v => `"${v}"`).join(',')
+        )
+      ].join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `data-export-${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Initialize on load
+    window.addEventListener('load', init);
+  </script>
+</body>
+</html>

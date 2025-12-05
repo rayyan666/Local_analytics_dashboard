@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Local Analytic Chatbot</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --surface:#1e293b;
+      --surface-alt:#334155;
+      --accent:#3b82f6;
+      --accent-hover:#2563eb;
+      --accent-light:#dbeafe;
+      --success:#10b981;
+      --danger:#ef4444;
+      --text-primary:#f1f5f9;
+      --text-secondary:#cbd5e1;
+      --text-muted:#94a3b8;
+      --border:#475569;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+    
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(135deg,#0f172a 0%, #1e293b 100%);color:var(--text-primary);line-height:1.6}
+    
+    .app{max-width:1400px;margin:0 auto;padding:20px;display:grid;grid-template-columns:360px 1fr;gap:24px;height:100vh}
+    
+    /* Smooth scrollbar */
+    ::-webkit-scrollbar{width:8px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(148,163,184,0.4);border-radius:4px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,0.6)}
+
+    /* Header & Branding */
+    .panel{background:var(--surface);border-radius:16px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,0.3);display:flex;flex-direction:column;height:100vh;overflow-y:auto;border:1px solid var(--border)}
+    .brand{display:flex;gap:14px;align-items:center;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+    .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#0ea5e9);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:20px;box-shadow:0 8px 16px rgba(59,130,246,0.3)}
+    .brand-text h1{font-size:22px;margin:0;color:var(--text-primary);font-weight:700}
+    .brand-text p{font-size:13px;margin:4px 0 0;color:var(--text-muted)}
+
+    .section{margin-bottom:28px}
+    .section-title{font-size:13px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;margin-bottom:12px}
+
+    /* File Upload */
+    .file-area{background:linear-gradient(135deg,rgba(59,130,246,0.08),rgba(14,165,233,0.04));padding:16px;border-radius:12px;border:2px dashed var(--border);transition:all 0.3s;cursor:pointer}
+    .file-area:hover{border-color:var(--accent);background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(14,165,233,0.08))}
+    .file-area.drag-over{border-color:var(--accent);background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(14,165,233,0.1))}
+    .file-input-label{font-size:13px;color:var(--text-muted);margin-bottom:10px;display:block}
+    #fileInput{display:none}
+    .file-input-custom{display:flex;align-items:center;justify-content:center;padding:14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:transparent;transition:all 0.3s;color:var(--text-secondary)}
+    .file-input-custom:hover{background:rgba(59,130,246,0.1);color:var(--accent)}
+    
+    .file-list{max-height:200px;overflow-y:auto;margin-top:12px}
+    .file-item{display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px;margin-bottom:8px;border:1px solid transparent;transition:all 0.2s}
+    .file-item:hover{background:rgba(59,130,246,0.1);border-color:var(--accent)}
+    .file-name{font-size:12px;color:var(--text-secondary);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .file-actions{display:flex;gap:6px}
+    .file-item button{background:transparent;border:1px solid var(--border);padding:6px 10px;border-radius:6px;color:var(--text-muted);cursor:pointer;font-size:11px;font-weight:600;transition:all 0.2s}
+    .file-item button:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+    /* Buttons - Premium Style */
+    .btn{padding:10px 16px;border-radius:8px;border:none;font-weight:600;cursor:pointer;font-size:14px;transition:all 0.3s;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),#0ea5e9);color:#fff;box-shadow:0 8px 16px rgba(59,130,246,0.3)}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 24px rgba(59,130,246,0.4)}
+    .btn-primary:active{transform:translateY(0)}
+    .btn-secondary{background:var(--surface-alt);color:var(--text-secondary);border:1px solid var(--border)}
+    .btn-secondary:hover{background:rgba(59,130,246,0.1);color:var(--accent);border-color:var(--accent)}
+    .btn-small{padding:8px 12px;font-size:12px}
+    .btn-block{width:100%;justify-content:center}
+
+    .button-group{display:flex;gap:10px;margin-bottom:16px}
+    .button-group .btn{flex:1}
+
+    /* Options */
+    .options{display:flex;flex-direction:column;gap:12px}
+    .checkbox-label{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-secondary);padding:10px;border-radius:8px;transition:all 0.2s}
+    .checkbox-label:hover{background:rgba(59,130,246,0.08);color:var(--text-primary)}
+    .checkbox-label input{cursor:pointer;accent-color:var(--accent)}
+
+    /* Status badges */
+    .status-bar{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:20px;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px}
+    .badge{padding:6px 10px;border-radius:6px;background:rgba(59,130,246,0.1);color:var(--accent);font-weight:600}
+    .badge.offline{background:rgba(239,68,68,0.1);color:var(--danger)}
+    .badge.online{background:rgba(16,185,129,0.1);color:var(--success)}
+
+    /* Chat Section */
+    .chat-wrap{display:flex;flex-direction:column;height:100vh;gap:16px}
+    .chat-header{display:flex;align-items:center;justify-content:space-between;padding:18px;background:var(--surface);border-radius:16px;border:1px solid var(--border);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+    .chat-header-left h2{font-size:18px;margin:0;color:var(--text-primary)}
+    .chat-header-left p{font-size:12px;margin:4px 0 0;color:var(--text-muted)}
+    .chat-meta{display:flex;gap:12px;align-items:center}
+    .meta-badge{font-size:11px;padding:8px 12px;border-radius:6px;background:rgba(59,130,246,0.1);color:var(--accent);font-weight:600}
+
+    .chat-window{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);flex:1;padding:20px;border-radius:16px;overflow-y:auto;border:1px solid var(--border);display:flex;flex-direction:column;gap:16px}
+    .message{display:flex;gap:10px;animation:slideIn 0.3s ease}
+    @keyframes slideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .message.user{justify-content:flex-end}
+    .bubble{max-width:70%;padding:14px 16px;border-radius:12px;line-height:1.5;transition:all 0.2s}
+    .message.bot .bubble{background:var(--surface-alt);color:var(--text-primary);border:1px solid var(--border)}
+    .message.user .bubble{background:linear-gradient(135deg,var(--accent),#0ea5e9);color:#fff;box-shadow:0 4px 12px rgba(59,130,246,0.3)}
+
+    .composer{display:flex;gap:12px;padding:16px;background:var(--surface);border-radius:16px;border:1px solid var(--border);align-items:flex-end}
+    .composer textarea{flex:1;min-height:50px;max-height:120px;background:transparent;border:1px solid var(--border);padding:12px;border-radius:8px;color:var(--text-primary);font-family:inherit;font-size:14px;resize:vertical}
+    .composer textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
+    .composer-actions{display:flex;gap:8px;flex-direction:column}
+
+    .result-box{background:var(--surface);padding:16px;border-radius:12px;border:1px solid var(--border);display:none}
+    .result-box.show{display:block;animation:slideIn 0.3s ease}
+    .result-box h3{margin:0 0 12px;font-size:14px;color:var(--text-primary)}
+    #resultPreview{max-height:300px;overflow-y:auto;background:rgba(0,0,0,0.2);padding:12px;border-radius:8px;font-size:12px}
+    #resultPreview img{max-width:100%;height:auto;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);transition:all 0.3s;cursor:pointer}
+    #resultPreview img:hover{transform:scale(1.02);box-shadow:0 8px 20px rgba(59,130,246,0.3)}
+    .result-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+    /* Graph Expand Modal */
+    .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:2000;animation:fadeIn 0.3s ease;backdrop-filter:blur(4px)}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .modal-content{position:relative;max-width:90vw;max-height:90vh;background:var(--surface);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:1px solid var(--border);display:flex;flex-direction:column;animation:slideIn 0.3s ease}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+    .modal-header h2{margin:0;font-size:18px;color:var(--text-primary)}
+    .modal-close{width:40px;height:40px;border:none;background:rgba(239,68,68,0.1);color:var(--danger);border-radius:8px;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;font-weight:bold}
+    .modal-close:hover{background:rgba(239,68,68,0.2);transform:scale(1.05)}
+    .modal-body{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto}
+    .modal-body img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+
+    /* Toast notifications */
+    .toast{position:fixed;bottom:20px;right:20px;background:var(--surface);color:var(--text-primary);padding:14px 18px;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.3);font-size:13px;border:1px solid var(--border);animation:slideInUp 0.3s ease;z-index:1000}
+    @keyframes slideInUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+    /* Responsive */
+    @media (max-width:1024px){
+      .app{grid-template-columns:1fr;padding:12px}
+      .panel{height:auto;max-height:400px;margin-bottom:20px;order:2}
+      .chat-wrap{height:auto;min-height:600px;order:1}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Left Panel -->
+    <div class="panel">
+      <div class="brand">
+        <div class="logo">📊</div>
+        <div class="brand-text">
+          <h1>Local Analytic</h1>
+          <p>AI-powered data analysis</p>
+        </div>
+      </div>
+
+      <!-- File Upload Section -->
+      <div class="section">
+        <div class="section-title">📁 Upload CSV</div>
+        <div class="file-area" id="fileArea">
+          <label class="file-input-label">Select or drag & drop</label>
+          <input id="fileInput" type="file" accept=".csv" />
+          <div class="file-input-custom" onclick="document.getElementById('fileInput').click()">
+            <span>Choose File</span>
+          </div>
+        </div>
+        
+        <div class="button-group" style="margin-top:12px">
+          <button id="uploadBtn" class="btn btn-primary btn-small btn-block">Upload</button>
+        </div>
+
+        <div class="file-list" id="fileList" aria-live="polite"></div>
+      </div>
+
+      <!-- Status -->
+      <div class="status-bar">
+        <div>Backend: <span id="backendStatus" class="badge online">●</span></div>
+        <div>Files: <span style="color:var(--accent);font-weight:700" id="uploadedCount">0</span></div>
+      </div>
+
+      <!-- Options -->
+      <div class="section">
+        <div class="section-title">Options</div>
+        <div class="options">
+          <label class="checkbox-label">
+            <input id="pdfToggle" type="checkbox" />
+            <span>Generate PDF report</span>
+          </label>
+          <label class="checkbox-label">
+            <input id="showRaw" type="checkbox" />
+            <span>Show raw LLM output</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:20px;border-top:1px solid var(--border)">
+        <button class="btn btn-primary btn-block" onclick="window.location.href='/dashboard'" style="background:linear-gradient(135deg,#10b981,#059669)">📊 Dashboard</button>
+        <button id="clearChat" class="btn btn-secondary btn-block btn-small">Clear Chat</button>
+        <button id="openDocs" class="btn btn-secondary btn-block btn-small" onclick="window.open('/api/docs','_blank')"> API Docs</button>
+      </div>
+    </div>
+
+    <!-- Right Chat Section -->
+    <div class="chat-wrap">
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <h2>Chat</h2>
+          <p>Ask questions about your data</p>
+        </div>
+        <div class="chat-meta">
+          <div class="meta-badge" id="selectedFileBadge">No file</div>
+          <div class="meta-badge" id="responseTime">—</div>
+        </div>
+      </div>
+
+      <div id="chatWindow" class="chat-window" role="log" aria-live="polite">
+        <div class="message" style="justify-content:center;opacity:0.6;margin-top:20px">
+          <div class="bubble" style="text-align:center;background:transparent"> Welcome! Upload a CSV and start asking questions</div>
+        </div>
+      </div>
+
+      <div class="composer">
+        <textarea id="prompt" placeholder="Ask anything about your data... (Shift+Enter for new line)" ></textarea>
+        <div class="composer-actions">
+          <button id="sendBtn" class="btn btn-primary">Send</button>
+          <button id="downloadPdfBtn" class="btn btn-secondary btn-small" style="display:none">📥 PDF</button>
+        </div>
+      </div>
+
+      <div class="result-box" id="resultBox">
+        <h3>Results</h3>
+        <div id="resultPreview"></div>
+        <div class="result-actions">
+          <button id="showJson" class="btn btn-secondary btn-small"> JSON</button>
+          <button id="showChart" class="btn btn-secondary btn-small" style="display:none"> Fullscreen</button>
+          <button id="expandChart" class="btn btn-secondary btn-small" style="display:none" title="Expand graph">🔍 Expand</button>
+        </div>
+      </div>
+
+      <!-- Graph Expand Modal -->
+      <div id="chartModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeChartModal()">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>📊 Chart View</h2>
+            <button class="modal-close" onclick="closeChartModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <img id="chartModalImage" src="" alt="Expanded chart" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Professional smooth frontend with modern interactions
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileList = document.getElementById('fileList');
+    const selectedFileBadge = document.getElementById('selectedFileBadge');
+    const uploadedCount = document.getElementById('uploadedCount');
+    const sendBtn = document.getElementById('sendBtn');
+    const promptEl = document.getElementById('prompt');
+    const chatWindow = document.getElementById('chatWindow');
+    const resultBox = document.getElementById('resultBox');
+    const resultPreview = document.getElementById('resultPreview');
+    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+    const pdfToggle = document.getElementById('pdfToggle');
+    const showRaw = document.getElementById('showRaw');
+    const showJsonBtn = document.getElementById('showJson');
+    const showChartBtn = document.getElementById('showChart');
+    const clearChat = document.getElementById('clearChat');
+    const fileArea = document.getElementById('fileArea');
+    
+    let selectedFilePath = null;
+    let selectedFilePaths = [];  // For multi-file analysis
+    let lastPdfPath = null;
+    let lastRaw = null;
+    let messageCount = 0;
+
+    // Toast notification
+    function toast(msg, dur=2500){
+      const el = document.createElement('div'); 
+      el.className = 'toast';
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(()=>{
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.3s';
+        setTimeout(()=>el.remove(), 300);
+      }, dur);
+    }
+
+    // File upload
+    async function uploadFile(){
+      const f = fileInput.files[0];
+      if(!f){toast('📁 Pick a CSV file first');return}
+      uploadBtn.disabled = true;
+      uploadBtn.innerHTML = '⏳ Uploading...';
+      try{
+        const form = new FormData();
+        form.append('file', f);
+        const res = await fetch('/upload', {method:'POST', body: form});
+        const j = await res.json();
+        if(res.ok){
+          toast('File uploaded successfully');
+          addFileToList(j.file_path);
+          fileInput.value = '';
+          // Show data profile if present
+          if(j.profile){
+            showDataProfile(j.profile, f.name);
+          }
+        } else {
+          toast('Upload failed');
+          console.error(j);
+        }
+      }catch(err){
+        console.error(err);
+        toast('Upload error');
+      }
+      uploadBtn.disabled=false;
+      uploadBtn.innerHTML = 'Upload';
+    }
+
+    // Show data profile summary
+    function showDataProfile(profile, filename){
+      let html = `<div class='result-box show' style='margin-top:18px'>`;
+      html += `<h3>📊 Data Profile: <span style='color:var(--accent)'>${filename}</span></h3>`;
+      if(profile.error){
+        html += `<div style='color:var(--danger)'>${profile.error}</div>`;
+      } else {
+        html += `<div style='font-size:13px;line-height:1.7'>`;
+        html += `<b>Shape:</b> ${profile.shape ? profile.shape.join(' x ') : ''}<br/>`;
+        html += `<b>Columns:</b> ${profile.columns ? profile.columns.join(', ') : ''}<br/>`;
+        html += `<b>Types:</b> ${profile.dtypes ? Object.entries(profile.dtypes).map(([k,v])=>`${k}: <span style='color:var(--accent)'>${v}</span>`).join(', ') : ''}<br/>`;
+        html += `<b>Missing:</b> ${profile.missing ? Object.entries(profile.missing).map(([k,v])=>`${k}: <span style='color:var(--danger)'>${v}</span>`).join(', ') : ''}<br/>`;
+        if(profile.unique_values){
+          html += `<b>Unique Values:</b> ${Object.entries(profile.unique_values).map(([k,v])=>`${k}: <span style='color:var(--success)'>${v}</span>`).join(', ')}<br/>`;
+        }
+        if(profile.outliers && Object.keys(profile.outliers).length){
+          html += `<b>Outliers:</b> ${Object.entries(profile.outliers).map(([k,v])=>`${k}: <span style='color:var(--danger)'>${v}</span>`).join(', ')}<br/>`;
+        }
+        if(profile.correlation && Object.keys(profile.correlation).length){
+          html += `<b>Correlations:</b><br/><div style='max-height:120px;overflow:auto;background:rgba(59,130,246,0.05);padding:6px;border-radius:6px'>`;
+          for(const [col,vals] of Object.entries(profile.correlation)){
+            html += `<b>${col}:</b> ` + Object.entries(vals).map(([k,v])=>`${k}: <span style='color:var(--accent)'>${(+v).toFixed(2)}</span>`).join(', ') + '<br/>';
+          }
+          html += `</div>`;
+        }
+        if(profile.describe){
+          html += `<b>Describe:</b><br/><div style='max-height:120px;overflow:auto;background:rgba(59,130,246,0.05);padding:6px;border-radius:6px'><pre style='font-size:12px;color:var(--text-secondary);white-space:pre-wrap'>${JSON.stringify(profile.describe,null,2)}</pre></div>`;
+        }
+        if(profile.sample){
+          html += `<b>Sample Rows:</b><br/><div style='max-height:120px;overflow:auto;background:rgba(59,130,246,0.05);padding:6px;border-radius:6px'><pre style='font-size:12px;color:var(--text-secondary);white-space:pre-wrap'>${JSON.stringify(profile.sample,null,2)}</pre></div>`;
+        }
+        html += `</div>`;
+      }
+      html += `</div>`;
+      // Insert or update profile summary
+      let old = document.getElementById('dataProfileBox');
+      if(old) old.remove();
+      const panel = document.querySelector('.panel');
+      const div = document.createElement('div');
+      div.id = 'dataProfileBox';
+      div.innerHTML = html;
+      panel.appendChild(div);
+    }
+
+    // Add file to list
+    function addFileToList(path){
+      const name = path.split('/').pop().replace(/^[a-f0-9\-]+_/, '');
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      
+      const nameEl = document.createElement('div');
+      nameEl.className = 'file-name';
+      nameEl.textContent = '📄 ' + name;
+      nameEl.title = name;
+      
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'file-actions';
+      
+      // Checkbox for multi-select
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.onchange = ()=>{
+        if(checkbox.checked){
+          if(!selectedFilePaths.includes(path)) selectedFilePaths.push(path);
+          if(!selectedFilePath) selectedFilePath = path;
+          item.style.background = 'rgba(59,130,246,0.15)';
+          updateFileBadge();
+        } else {
+          selectedFilePaths = selectedFilePaths.filter(p => p !== path);
+          if(selectedFilePath === path) selectedFilePath = selectedFilePaths[0] || null;
+          item.style.background = '';
+          updateFileBadge();
+        }
+      };
+      
+      const selectBtn = document.createElement('button');
+      selectBtn.className = 'btn btn-secondary btn-small';
+      selectBtn.textContent = 'Use';
+      selectBtn.title = 'Single file analysis';
+      selectBtn.onclick = ()=>{
+        checkbox.checked = false;
+        selectedFilePaths = [];
+        selectedFilePath = path;
+        updateFileBadge();
+        // Clear chat when selecting new file
+        chatWindow.innerHTML = '';
+        resultBox.classList.remove('show');
+      };
+      
+      const openBtn = document.createElement('button');
+      openBtn.className = 'btn btn-secondary btn-small';
+      openBtn.textContent = 'Open';
+      openBtn.onclick = ()=>{window.open(path,'_blank')};
+      
+      actionsDiv.appendChild(checkbox);
+      actionsDiv.appendChild(selectBtn);
+      actionsDiv.appendChild(openBtn);
+      item.appendChild(nameEl);
+      item.appendChild(actionsDiv);
+      fileList.prepend(item);
+      
+      uploadedCount.textContent = parseInt(uploadedCount.textContent||'0')+1;
+      // Auto-select first file
+      if(!selectedFilePath){
+        selectedFilePath = path;
+        selectedFileBadge.textContent = name;
+      }
+    }
+
+    // Send chat message
+    async function sendChat(){
+      const prompt = promptEl.value.trim();
+      if(!prompt){promptEl.focus();return}
+      if(!selectedFilePath){toast('⚠️ Please select a file first');return}
+      
+      appendMessage('user', prompt);
+      sendBtn.disabled=true;
+      sendBtn.innerHTML = '⏳ Analyzing...';
+      promptEl.value = '';
+      
+      const payload = {
+        user_prompt: prompt,
+        source_type: 'file',
+        source_alias: null,
+        file_path: selectedFilePath,
+        return_pdf: !!pdfToggle.checked
+      };
+      
+      const t0 = performance.now();
+      try{
+        const res = await fetch('/chat', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(payload)
+        });
+        const t1 = performance.now();
+        const responseTime = Math.round(t1-t0);
+        document.getElementById('responseTime').textContent = responseTime + 'ms';
+        
+        const j = await res.json();
+        lastRaw = j;
+        
+        if(!res.ok){
+          appendMessage('bot', 'Error: '+(j.detail || j.error || JSON.stringify(j)));
+          console.error(j);
+        } else {
+          handleResult(j);
+        }
+      }catch(err){
+        appendMessage('bot','Network error. Check backend.');
+        console.error(err);
+      }
+      sendBtn.disabled=false;
+      sendBtn.innerHTML = 'Send';
+      promptEl.focus();
+    }
+
+    // Append message to chat
+    function appendMessage(role, text){
+      const msg = document.createElement('div');
+      msg.className = 'message '+(role==='user'?'user':'');
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble '+(role==='user'?'user':'');
+      bubble.textContent = text;
+      msg.appendChild(bubble);
+      chatWindow.appendChild(msg);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    // Handle result
+    function handleResult(j){
+      // Display the LLM's natural language message in chat
+      if(j.message){
+        appendMessage('bot', j.message);
+      } else {
+        appendMessage('bot','✓ Analysis complete');
+      }
+      
+      // If there's actual results data, show it in the result box
+      if(j.result){
+        resultBox.classList.add('show');
+        resultPreview.innerHTML = '';
+        
+        // Display results data
+        if(j.result.result && j.result.result.records){
+          const recs = j.result.result.records;
+          const pre = document.createElement('pre');
+          pre.style.whiteSpace = 'pre-wrap';
+          pre.style.maxHeight = '280px';
+          pre.style.overflow = 'auto';
+          pre.textContent = JSON.stringify(recs, null, 2);
+          resultPreview.appendChild(pre);
+        } else if(j.result.result && j.result.result.dataframe_json){
+          const pre = document.createElement('pre');
+          pre.textContent = JSON.stringify(j.result.result.dataframe_json, null, 2);
+          resultPreview.appendChild(pre);
+        } else if(j.result.result && j.result.result.RESULT){
+          const pre = document.createElement('pre');
+          pre.textContent = JSON.stringify(j.result.result.RESULT, null, 2);
+          resultPreview.appendChild(pre);
+        } else if(j.result.result){
+          const pre = document.createElement('pre');
+          pre.textContent = JSON.stringify(j.result.result, null, 2);
+          resultPreview.appendChild(pre);
+        }
+
+        // Show chart if available
+        if(j.result.result && j.result.result.chart_png_base64){
+          const img = document.createElement('img');
+          img.style.maxWidth = '100%';
+          img.style.display = 'block';
+          img.style.marginTop = '12px';
+          img.style.borderRadius = '8px';
+          img.src = 'data:image/png;base64,' + j.result.result.chart_png_base64;
+          
+          // Make image clickable to expand
+          img.style.cursor = 'pointer';
+          img.onclick = (e) => {
+            e.stopPropagation();
+            openChartModal(img.src);
+          };
+          
+          resultPreview.appendChild(img);
+          showChartBtn.style.display = 'inline-flex';
+          
+          // Show expand button
+          document.getElementById('expandChart').style.display = 'inline-flex';
+          document.getElementById('expandChart').onclick = () => openChartModal(img.src);
+          
+          // Store chart data for fullscreen
+          lastRaw.chartImageSrc = img.src;
+        } else {
+          showChartBtn.style.display = 'none';
+          document.getElementById('expandChart').style.display = 'none';
+        }
+
+        // PDF download
+        if(j.pdf_path){
+          lastPdfPath = j.pdf_path;
+          downloadPdfBtn.style.display = 'inline-flex';
+          downloadPdfBtn.onclick = ()=>{ window.open(j.pdf_path, '_blank'); };
+        } else {
+          downloadPdfBtn.style.display = 'none';
+          lastPdfPath = null;
+        }
+      } else {
+        resultBox.classList.remove('show');
+      }
+
+      // Show raw output if enabled
+      if(showRaw.checked && lastRaw){
+        const rpre = document.createElement('pre');
+        rpre.style.marginTop = '12px';
+        rpre.style.fontSize = '10px';
+        rpre.style.opacity = '0.7';
+        rpre.textContent = JSON.stringify(lastRaw, null, 2);
+        resultPreview.appendChild(rpre);
+      }
+    }
+
+    // Chart modal functions
+    function openChartModal(imageSrc){
+      const modal = document.getElementById('chartModal');
+      const modalImg = document.getElementById('chartModalImage');
+      modalImg.src = imageSrc;
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeChartModal(){
+      const modal = document.getElementById('chartModal');
+      modal.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    }
+
+    // Keyboard shortcut to close modal
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape'){
+        closeChartModal();
+      }
+    });
+
+    // Event listeners
+    uploadBtn.addEventListener('click', uploadFile);
+    sendBtn.addEventListener('click', sendChat);
+    promptEl.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter' && !e.shiftKey){
+        e.preventDefault();
+        sendChat();
+      }
+    });
+    
+    clearChat.addEventListener('click', ()=>{
+      chatWindow.innerHTML = '';
+      resultBox.classList.remove('show');
+      lastPdfPath = null;
+      downloadPdfBtn.style.display = 'none';
+      toast('✓ Chat cleared');
+    });
+    
+    showJsonBtn.addEventListener('click', ()=>{
+      if(lastRaw){
+        const w = window.open('about:blank');
+        w.document.write('<pre style="padding:20px;background:#0f172a;color:#f1f5f9;font-family:monospace">' + 
+          JSON.stringify(lastRaw, null, 2).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>');
+      }
+    });
+    
+    showChartBtn.addEventListener('click', ()=>{
+      if(lastRaw && lastRaw.result && lastRaw.result.chart_png_base64){
+        const w = window.open('about:blank');
+        w.document.body.style.background = '#0f172a';
+        w.document.body.style.margin = '0';
+        const img = w.document.createElement('img');
+        img.src = 'data:image/png;base64,' + lastRaw.result.chart_png_base64;
+        img.style.width = '100%';
+        img.style.height = 'auto';
+        w.document.body.appendChild(img);
+      }
+    });
+
+    // Drag & drop
+    fileArea.addEventListener('dragover', (e)=>{
+      e.preventDefault();
+      fileArea.classList.add('drag-over');
+    });
+    
+    fileArea.addEventListener('dragleave', ()=>{
+      fileArea.classList.remove('drag-over');
+    });
+    
+    fileArea.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      fileArea.classList.remove('drag-over');
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if(f && f.name.endsWith('.csv')){
+        fileInput.files = e.dataTransfer.files;
+        toast('File loaded — click Upload');
+        uploadFile();
+      } else {
+        toast('Only CSV files allowed');
+      }
+    });
+
+    // Backend status check
+    (async function init(){
+      try{
+        const r = await fetch('/');
+        if(r.ok){
+          document.getElementById('backendStatus').textContent = '●';
+          document.getElementById('backendStatus').className = 'badge online';
+        } else {
+          document.getElementById('backendStatus').textContent = '●';
+          document.getElementById('backendStatus').className = 'badge offline';
+        }
+      }catch(e){
+        document.getElementById('backendStatus').textContent = '●';
+        document.getElementById('backendStatus').className = 'badge offline';
+      }
+    })();
+  </script>
+</body>
+</html>

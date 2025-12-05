@@ -1,0 +1,105 @@
+# backend/fastapi_app.py
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.responses import JSONResponse, FileResponse
+from pydantic import BaseModel
+import shutil, os, uuid, json
+from pathlib import Path
+from llm_adapters.llama_cpp_adapter import LlamaAdapter
+from executors.sandbox_executor import execute_python_safely, execute_sql_safely
+from reports.report_generator import make_pdf, decode_base64_png
+from utils.db_connectors import sqlite_info
+
+app = FastAPI(title="Localized Chatbot Backend", docs_url="/api/docs")
+
+BASE = Path(".")
+DATA_DIR = BASE / "data"
+UPLOAD_DIR = DATA_DIR / "uploads"
+MODELS_DIR = BASE / "models"
+DATA_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR.mkdir(exist_ok=True)
+MODELS_DIR.mkdir(exist_ok=True)
+
+# Simple in-memory DB registry
+DB_REGISTRY = {}
+
+# Configure LLM adapter: default model path (user must place model in models/)
+DEFAULT_MODEL = str(MODELS_DIR / "ggml-mistral-7b-instruct-q4.gguf")
+llm = LlamaAdapter(model_path=DEFAULT_MODEL)
+
+@app.get("/")
+def root():
+    return {"msg": "Localized Chatbot backend. Use /static/index.html for frontend."}
+
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    uid = str(uuid.uuid4())
+    filename = f"{uid}_{file.filename}"
+    out_path = UPLOAD_DIR / filename
+    with open(out_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    return {"file_path": str(out_path)}
+
+@app.post("/register_sqlite")
+def register_sqlite(path: str = Form(...), alias: str = Form(...)):
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="path not found")
+    DB_REGISTRY[alias] = sqlite_info(path)
+    return {"status": "ok", "alias": alias}
+
+class ChatRequest(BaseModel):
+    user_prompt: str
+    source_type: str  # "db" or "file"
+    source_alias: str = None
+    file_path: str = None
+    return_pdf: bool = False
+
+@app.post("/chat")
+def chat(req: ChatRequest):
+    system = f"""
+You are a data assistant. Output must be a single JSON object and nothing else.
+If source_type is db, respond with: {{"type":"sql","code":"<SQL>"}}
+If source_type is file, respond with: {{"type":"pandas","code":"<PYTHON_CODE>"}}
+Rules for pandas code:
+- Allowed names: pd, np, plt, FILE_PATH
+- DO NOT open network connections.
+- At the end assign RESULT = <DataFrame or dict>. If you generate a chart save it to 'chart.png'.
+- The file to load is available as FILE_PATH.
+Respond with only the JSON object.
+"""
+    prompt = system + "\nUser: " + req.user_prompt + f"\nsource_type: {req.source_type}\nfile_path: {req.file_path}\n"
+    resp = llm.generate(prompt, max_tokens=1024, temperature=0.0)
+    # Try to extract JSON from model output
+    try:
+        j = json.loads(resp.strip())
+    except Exception as e:
+        return JSONResponse({"error": "invalid LLM output", "raw": resp}, status_code=500)
+
+    if j.get("type") == "sql":
+        alias = req.source_alias
+        if not alias or alias not in DB_REGISTRY:
+            raise HTTPException(status_code=400, detail="unknown or missing DB alias")
+        conn_info = DB_REGISTRY[alias]
+        # Very simple safety: disallow non-SELECT statements
+        sql = j.get("code", "")
+        if not sql.strip().lower().startswith("select"):
+            return JSONResponse({"error": "only SELECT allowed for safety", "sql": sql}, status_code=400)
+        result = execute_sql_safely(conn_info, sql)
+        return {"llm_raw": resp, "result": result}
+    elif j.get("type") == "pandas":
+        code = j.get("code", "")
+        file_path = req.file_path
+        out = execute_python_safely(code, file_path=file_path)
+        # If chart present, optionally create PDF
+        if req.return_pdf and out.get("result") and out["result"].get("chart_png_base64"):
+            b64 = out["result"]["chart_png_base64"]
+            img_bytes = decode_base64_png(b64)
+            pdf_path = f"report_{uuid.uuid4().hex}.pdf"
+            make_pdf("Report", out["result"].get("records", []), img_bytes, pdf_path)
+            return {"llm_raw": resp, "result": out, "pdf_path": pdf_path}
+        return {"llm_raw": resp, "result": out}
+    else:
+        return JSONResponse({"error": "unknown type from LLM", "raw": j}, status_code=500)
+
+# Serve frontend static
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
