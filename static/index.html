@@ -143,14 +143,14 @@
       <div class="brand">
         <div class="logo">📊</div>
         <div class="brand-text">
-          <h1>Local Analytic</h1>
-          <p>AI-powered data analysis</p>
+          <h1>DASH AI+</h1>
+          <p>AI powered data analysis</p>
         </div>
       </div>
 
       <!-- File Upload Section -->
       <div class="section">
-        <div class="section-title">📁 Upload CSV</div>
+        <div class="section-title"> Upload CSV</div>
         <div class="file-area" id="fileArea">
           <label class="file-input-label">Select or drag & drop</label>
           <input id="fileInput" type="file" accept=".csv" />
@@ -189,7 +189,7 @@
 
       <!-- Actions -->
       <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:20px;border-top:1px solid var(--border)">
-        <button class="btn btn-primary btn-block" onclick="window.location.href='/dashboard'" style="background:linear-gradient(135deg,#10b981,#059669)">📊 Dashboard</button>
+        <button class="btn btn-primary btn-block" onclick="window.location.href='/dashboard'" style="background:linear-gradient(135deg,#10b981,#059669)">Dashboard</button>
         <button id="clearChat" class="btn btn-secondary btn-block btn-small">Clear Chat</button>
         <button id="openDocs" class="btn btn-secondary btn-block btn-small" onclick="window.open('/api/docs','_blank')"> API Docs</button>
       </div>
@@ -218,7 +218,7 @@
         <textarea id="prompt" placeholder="Ask anything about your data... (Shift+Enter for new line)" ></textarea>
         <div class="composer-actions">
           <button id="sendBtn" class="btn btn-primary">Send</button>
-          <button id="downloadPdfBtn" class="btn btn-secondary btn-small" style="display:none">📥 PDF</button>
+          <button id="downloadPdfBtn" class="btn btn-secondary btn-small" style="display:none">PDF</button>
         </div>
       </div>
 
@@ -236,7 +236,7 @@
       <div id="chartModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeChartModal()">
         <div class="modal-content">
           <div class="modal-header">
-            <h2>📊 Chart View</h2>
+            <h2>Chart View</h2>
             <button class="modal-close" onclick="closeChartModal()">✕</button>
           </div>
           <div class="modal-body">
@@ -286,6 +286,19 @@
       }, dur);
     }
 
+    // Update file badge with selected files
+    function updateFileBadge(){
+      if(selectedFilePaths.length > 1){
+        selectedFileBadge.textContent = `${selectedFilePaths.length} files selected`;
+        selectedFileBadge.title = 'Multi-file analysis enabled';
+      } else if(selectedFilePath){
+        const fname = selectedFilePath.split('/').pop().replace(/^[a-f0-9\-]+_/, '');
+        selectedFileBadge.textContent = fname;
+      } else {
+        selectedFileBadge.textContent = 'No file';
+      }
+    }
+
     // File upload
     async function uploadFile(){
       const f = fileInput.files[0];
@@ -320,7 +333,7 @@
     // Show data profile summary
     function showDataProfile(profile, filename){
       let html = `<div class='result-box show' style='margin-top:18px'>`;
-      html += `<h3>📊 Data Profile: <span style='color:var(--accent)'>${filename}</span></h3>`;
+      html += `<h3> Data Profile: <span style='color:var(--accent)'>${filename}</span></h3>`;
       if(profile.error){
         html += `<div style='color:var(--danger)'>${profile.error}</div>`;
       } else {
@@ -422,7 +435,7 @@
       // Auto-select first file
       if(!selectedFilePath){
         selectedFilePath = path;
-        selectedFileBadge.textContent = name;
+        updateFileBadge();
       }
     }
 
@@ -430,24 +443,31 @@
     async function sendChat(){
       const prompt = promptEl.value.trim();
       if(!prompt){promptEl.focus();return}
-      if(!selectedFilePath){toast('⚠️ Please select a file first');return}
+      
+      // Check if analyzing multiple files
+      const filesForAnalysis = selectedFilePaths.length > 0 ? selectedFilePaths : [selectedFilePath];
+      if(!filesForAnalysis[0]){toast('⚠️ Please select a file first');return}
       
       appendMessage('user', prompt);
       sendBtn.disabled=true;
-      sendBtn.innerHTML = '⏳ Analyzing...';
+      sendBtn.innerHTML = 'Analyzing...';
       promptEl.value = '';
+      
+      const isMultiFile = selectedFilePaths.length > 0;
+      const endpoint = isMultiFile ? '/analyze' : '/chat';
       
       const payload = {
         user_prompt: prompt,
         source_type: 'file',
         source_alias: null,
         file_path: selectedFilePath,
+        file_paths: selectedFilePaths.length > 0 ? selectedFilePaths : null,
         return_pdf: !!pdfToggle.checked
       };
       
       const t0 = performance.now();
       try{
-        const res = await fetch('/chat', {
+        const res = await fetch(endpoint, {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify(payload)
