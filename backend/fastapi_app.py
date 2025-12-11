@@ -11,6 +11,8 @@ from .reports.report_generator import make_pdf, decode_base64_png
 from .utils.db_connectors import sqlite_info
 from .utils.code_validator import CodeValidator
 from .utils.data_profiler import deep_data_profile
+from .utils.error_suggester import ErrorSuggester
+from .utils.query_cache import query_cache
 
 app = FastAPI(title="Local Analytic Chatbot", docs_url="/api/docs")
 
@@ -504,40 +506,61 @@ def chat(req: ChatRequest):
         # Validate the generated code before execution
         is_valid, error_msg = CodeValidator.validate(code)
         if not is_valid:
+            suggestion = ErrorSuggester.suggest(error_msg)
             return JSONResponse({
                 "error": "Code validation failed",
-                "detail": error_msg,
+                "detail": suggestion["hint"],
+                "suggestion": suggestion["suggestion"],
+                "code_fix": suggestion["code_fix"],
                 "llm_raw": raw_text[:200],
-                "message": f"Invalid code: {error_msg}"
+                "message": f"Invalid code: {suggestion['hint']}"
             }, status_code=400)
         
-        try:
-            result_data = execute_python_safely(code, file_path=file_path)
+        # CHECK CACHE before executing
+        import time
+        cache_hit = False
+        cache_start = time.time()
+        if query_cache.should_use_cache(code):
+            cached_result = query_cache.get(file_path, code)
+            if cached_result is not None:
+                cache_hit = True
+                result_data = {"ok": True, "result": cached_result}
+                cache_time = time.time() - cache_start
+                print(f"DEBUG: Cache hit! Saved ~{cache_time:.3f}s by avoiding execution", file=sys.stderr)
+        
+        if not cache_hit:
+            try:
+                result_data = execute_python_safely(code, file_path=file_path)
+            except Exception as exec_err:
+                import traceback
+                return JSONResponse({
+                    "error": "Code execution failed",
+                    "detail": str(exec_err),
+                    "traceback": traceback.format_exc()[:500],
+                    "message": response_text if response_text else "An error occurred while processing your request"
+                }, status_code=500)
             
             # Check if execution had an error
             if not result_data.get("ok"):
                 error_detail = result_data.get("error", "Unknown error")
-                # Provide helpful suggestions for common errors
-                helpful_msg = error_detail
-                if "KeyError" in error_detail:
-                    helpful_msg = f"{error_detail}\n\nTIP: Column may not exist. Try asking 'What columns do I have?'"
-                elif "timeout" in error_detail.lower() or "killed" in error_detail.lower():
-                    helpful_msg = f"{error_detail}\n\nTIP: Limit data size with .head(100) or use sampling for faster processing"
+                # Use intelligent error suggester for helpful hints
+                suggestion = ErrorSuggester.suggest(error_detail)
                 
                 return JSONResponse({
                     "error": "Code execution error",
-                    "detail": helpful_msg,
+                    "detail": suggestion["hint"],
+                    "suggestion": suggestion["suggestion"],
+                    "code_fix": suggestion["code_fix"],
                     "message": response_text if response_text else "Error executing analysis code"
                 }, status_code=500)
-                
-        except Exception as exec_err:
-            import traceback
-            return JSONResponse({
-                "error": "Code execution failed",
-                "detail": str(exec_err),
-                "traceback": traceback.format_exc()[:500],
-                "message": response_text if response_text else "An error occurred while processing your request"
-            }, status_code=500)
+        
+        # CACHE successful result for future identical queries
+        if not cache_hit and result_data.get("ok") and result_data.get("result"):
+            try:
+                if query_cache.should_use_cache(code):
+                    query_cache.set(file_path, code, result_data["result"])
+            except Exception:
+                pass  # Cache errors are non-critical
         
         # If chart present and return_pdf requested, create PDF
         pdf_path = None
@@ -634,5 +657,22 @@ def load_data(file: str):
         raise HTTPException(status_code=500, detail=f"Error loading data: {str(e)}")
 
 
+@app.get("/cache-stats")
+def get_cache_stats():
+    """
+    Returns cache statistics for monitoring and debugging.
+    Shows hit rate, cache size, and performance metrics.
+    """
+    return query_cache.get_stats()
+
+
+@app.post("/cache-clear")
+def clear_cache():
+    """Clear all cached query results."""
+    query_cache.clear()
+    return {"status": "Cache cleared", "stats": query_cache.get_stats()}
+
+
 # Serve frontend static files under /static
 app.mount("/static", StaticFiles(directory=str(BASE / "static"), html=True), name="static")
+

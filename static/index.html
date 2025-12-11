@@ -143,7 +143,7 @@
       <div class="brand">
         <div class="logo">📊</div>
         <div class="brand-text">
-          <h1>DASH AI+</h1>
+          <h1>Dash AI</h1>
           <p>AI powered data analysis</p>
         </div>
       </div>
@@ -189,9 +189,10 @@
 
       <!-- Actions -->
       <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:20px;border-top:1px solid var(--border)">
+        <button class="btn btn-primary btn-block" onclick="showQueryHistory()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)">Query History</button>
         <button class="btn btn-primary btn-block" onclick="window.location.href='/dashboard'" style="background:linear-gradient(135deg,#10b981,#059669)">Dashboard</button>
         <button id="clearChat" class="btn btn-secondary btn-block btn-small">Clear Chat</button>
-        <button id="openDocs" class="btn btn-secondary btn-block btn-small" onclick="window.open('/api/docs','_blank')"> API Docs</button>
+        <button id="openDocs" class="btn btn-secondary btn-block btn-small" onclick="window.open('/api/docs','_blank')">📖 API Docs</button>
       </div>
     </div>
 
@@ -273,6 +274,103 @@
     let lastRaw = null;
     let messageCount = 0;
 
+    // ==================== QUERY HISTORY MANAGEMENT ====================
+    const HISTORY_KEY = 'queryHistory';
+    const BOOKMARKS_KEY = 'queryBookmarks';
+    const MAX_HISTORY = 50;
+
+    function getQueryHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function getBookmarks() {
+      try {
+        return JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function saveQuery(prompt, filePath, filePaths, response) {
+      const history = getQueryHistory();
+      const entry = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        prompt: prompt,
+        file: filePath ? filePath.split('/').pop().replace(/^[a-f0-9\-]+_/, '') : 'unknown',
+        filePath: filePath,
+        filePaths: filePaths,
+        responsePreview: response ? response.substring(0, 100) : 'No response',
+        isBookmarked: false
+      };
+      history.unshift(entry);
+      if (history.length > MAX_HISTORY) {
+        history.pop();
+      }
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      return entry;
+    }
+
+    function toggleBookmark(id) {
+      const history = getQueryHistory();
+      const entry = history.find(e => e.id === id);
+      if (entry) {
+        entry.isBookmarked = !entry.isBookmarked;
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+        return entry.isBookmarked;
+      }
+      return false;
+    }
+
+    function deleteFromHistory(id) {
+      const history = getQueryHistory().filter(e => e.id !== id);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    }
+
+    function rerunQuery(id) {
+      const history = getQueryHistory();
+      const entry = history.find(e => e.id === id);
+      if (entry) {
+        promptEl.value = entry.prompt;
+        if (entry.filePath) {
+          selectedFilePath = entry.filePath;
+          selectedFilePaths = entry.filePaths || [];
+          updateFileBadge();
+        }
+        promptEl.focus();
+        toast('Query loaded. Click Send to run.');
+      }
+    }
+
+    function showQueryHistory() {
+      const history = getQueryHistory();
+      if (history.length === 0) {
+        toast('No query history yet');
+        return;
+      }
+      let html = '<div style="position: fixed; top: 100px; right: 20px; width: 350px; max-height: 500px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 1000; overflow-y: auto;">';
+      html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"><h3 style="margin: 0; font-size: 16px;">Query History</h3><button onclick="this.closest(\'div\').parentElement.remove()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px;">✕</button></div>';
+      history.slice(0, 20).forEach(entry => {
+        html += `<div style="padding: 10px; background: rgba(59,130,246,0.05); border-radius: 8px; margin-bottom: 8px; font-size: 12px; border-left: 3px solid ${entry.isBookmarked ? 'var(--warning)' : 'var(--border)'};">`;
+        html += `<div style="font-weight: 600; color: var(--accent); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${entry.prompt.substring(0, 40)}...</div>`;
+        html += `<div style="color: var(--text-muted); margin-bottom: 6px;">📄 ${entry.file}</div>`;
+        html += `<div style="display: flex; gap: 6px;">`;
+        html += `<button onclick="rerunQuery(${entry.id})" style="flex: 1; padding: 6px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;">Rerun</button>`;
+        html += `<button onclick="toggleBookmark(${entry.id}); location.reload();" style="padding: 6px 8px; background: ${entry.isBookmarked ? 'var(--warning)' : 'var(--border)'}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">★</button>`;
+        html += `<button onclick="deleteFromHistory(${entry.id}); location.reload();" style="padding: 6px 8px; background: var(--danger); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">✕</button>`;
+        html += `</div></div>`;
+      });
+      html += '</div>';
+      document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    // ==================== END QUERY HISTORY ====================
+
+
     // Toast notification
     function toast(msg, dur=2500){
       const el = document.createElement('div'); 
@@ -348,6 +446,53 @@
         if(profile.outliers && Object.keys(profile.outliers).length){
           html += `<b>Outliers:</b> ${Object.entries(profile.outliers).map(([k,v])=>`${k}: <span style='color:var(--danger)'>${v}</span>`).join(', ')}<br/>`;
         }
+        
+        // Show advanced data quality issues
+        if(profile.quality_issues && Object.keys(profile.quality_issues).length){
+          html += `<br/><div style='background:rgba(239,68,68,0.1);border-left:3px solid var(--danger);padding:10px;border-radius:4px'>`;
+          html += `<b style='color:var(--danger)'>⚠️ Data Quality Issues Detected:</b><br/>`;
+          
+          if(profile.quality_issues.duplicates?.length){
+            for(const issue of profile.quality_issues.duplicates){
+              html += `<div style='margin:5px 0;font-size:12px'>`;
+              html += `• <b>${issue.type === 'complete_row_duplicates' ? '🔄 Duplicate Rows' : '🔄 ' + issue.column}:</b> ${issue.count} (${issue.percentage}%) - ${issue.recommendation}<br/>`;
+              html += `</div>`;
+            }
+          }
+          if(profile.quality_issues.type_mismatches?.length){
+            for(const issue of profile.quality_issues.type_mismatches){
+              html += `<div style='margin:5px 0;font-size:12px'>`;
+              html += `• <b>📝 Type Mismatch in '${issue.column}':</b> Stored as ${issue.current_type}, should be ${issue.likely_type} - ${issue.recommendation}<br/>`;
+              html += `</div>`;
+            }
+          }
+          if(profile.quality_issues.suspicious_patterns?.length){
+            for(const issue of profile.quality_issues.suspicious_patterns){
+              html += `<div style='margin:5px 0;font-size:12px'>`;
+              if(issue.issue === 'sparse_column'){
+                html += `• <b>📊 Sparse Column '${issue.column}':</b> ${issue.missing_percentage}% empty - ${issue.recommendation}<br/>`;
+              } else if(issue.issue === 'constant_column'){
+                html += `• <b>📊 Constant Column '${issue.column}':</b> Only value '${issue.value}' - ${issue.recommendation}<br/>`;
+              } else if(issue.issue === 'high_cardinality'){
+                html += `• <b>📊 High Cardinality '${issue.column}':</b> ${(issue.unique_ratio*100).toFixed(1)}% unique - ${issue.recommendation}<br/>`;
+              }
+              html += `</div>`;
+            }
+          }
+          if(profile.quality_issues.data_integrity?.length){
+            for(const issue of profile.quality_issues.data_integrity){
+              html += `<div style='margin:5px 0;font-size:12px'>`;
+              if(issue.issue === 'negative_values'){
+                html += `• <b>❌ Invalid Values in '${issue.column}':</b> ${issue.count} negative entries - ${issue.recommendation}<br/>`;
+              } else if(issue.issue === 'extreme_outliers'){
+                html += `• <b>❌ Extreme Outliers in '${issue.column}':</b> ${issue.count} extreme values - ${issue.recommendation}<br/>`;
+              }
+              html += `</div>`;
+            }
+          }
+          html += `</div><br/>`;
+        }
+        
         if(profile.correlation && Object.keys(profile.correlation).length){
           html += `<b>Correlations:</b><br/><div style='max-height:120px;overflow:auto;background:rgba(59,130,246,0.05);padding:6px;border-radius:6px'>`;
           for(const [col,vals] of Object.entries(profile.correlation)){
@@ -480,7 +625,17 @@
         lastRaw = j;
         
         if(!res.ok){
-          appendMessage('bot', 'Error: '+(j.detail || j.error || JSON.stringify(j)));
+          // Display improved error messages with suggestions
+          let errorMsg = 'Error: ' + (j.detail || j.error || JSON.stringify(j));
+          
+          // Build formatted error response with suggestions
+          if(j.suggestion || j.code_fix) {
+            errorMsg = `❌ **${j.detail || j.error || 'Error occurred'}**\n\n`;
+            if(j.suggestion) errorMsg += `💡 **Suggestion:** ${j.suggestion}\n`;
+            if(j.code_fix) errorMsg += `\n📝 **Try this:**\n\`\`\`\n${j.code_fix}\n\`\`\``;
+          }
+          
+          appendMessage('bot', errorMsg);
           console.error(j);
         } else {
           handleResult(j);
@@ -594,6 +749,11 @@
         rpre.style.opacity = '0.7';
         rpre.textContent = JSON.stringify(lastRaw, null, 2);
         resultPreview.appendChild(rpre);
+      }
+
+      // Save query to history with response preview
+      if(j.message) {
+        saveQuery(document.querySelector('.message.user:last-child .bubble')?.textContent || '', selectedFilePath, selectedFilePaths, j.message);
       }
     }
 
