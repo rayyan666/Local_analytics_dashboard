@@ -1,42 +1,56 @@
-# 🚀 Quick Start - Proven Launch Steps
+# 🚀 Quick Start - EC2 / Amazon Linux Setup
 
-## ⚙️ ONE-TIME SETUP
+## ⚙️ ONE-TIME SETUP (First Time)
 
-### Step 1: Activate Virtual Environment
+### Step 1: SSH into EC2
 ```bash
+ssh -i your-key.pem ec2-user@your-ec2-ip
+```
+
+### Step 2: Update System & Install Dependencies (Amazon Linux 2)
+```bash
+sudo yum update -y
+sudo yum install -y python3 python3-pip python3-devel git
+sudo yum install -y cmake pkgconfig gcc gcc-c++ make openssl-devel
+```
+
+### Step 3: Create Project Directory & Clone
+```bash
+cd ~
+git clone <your-repo-url>
+cd local_analytic_chatbot
+```
+
+### Step 4: Create Virtual Environment
+```bash
+python3 -m venv venv
 source venv/bin/activate
 ```
 
-### Step 2: Install System Dependencies (macOS)
-```bash
-xcode-select --install
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew update
-brew install cmake pkg-config libomp git
-```
-
-### Step 3: Upgrade Python Tools
+### Step 5: Upgrade Python Tools
 ```bash
 python3 -m pip install --upgrade pip setuptools wheel
 ```
 
-### Step 4: Install Build Tools
+### Step 6: Install Build Dependencies
 ```bash
-python3 -m pip install scikit-build-core scikit-build build ninja meson-python
+pip install scikit-build-core scikit-build build ninja meson-python
 ```
 
-### Step 5: Install llama-cpp-python with GPU Support
+### Step 7: Install llama-cpp-python (CPU mode for EC2)
 ```bash
-python3 -m pip uninstall -y llama-cpp-python
-CMAKE_ARGS="-DLLAMA_METAL=on" pip install --no-binary :all: --force-reinstall llama-cpp-python
+pip uninstall -y llama-cpp-python
+pip install llama-cpp-python
 ```
 
-### Step 6: Verify Installation
+> **Note:** For GPU support on EC2, use `CMAKE_ARGS="-DLLAMA_CUBLAS=on"` for NVIDIA GPU instances
+
+### Step 8: Verify Installation
 ```bash
 python3 -c "import numpy, llama_cpp; print('✅ All imports working!')"
 ```
 
-### Step 7: Create Required Directories
+### Step 9: Create Required Directories
 ```bash
 touch backend/__init__.py
 touch backend/llm_adapters/__init__.py
@@ -45,7 +59,7 @@ touch backend/reports/__init__.py
 touch backend/utils/__init__.py
 ```
 
-### Step 8: Download Model (see LAUNCH.md for full instructions)
+### Step 10: Download Model (see LAUNCH.md for full instructions)
 ```bash
 # Check if exists
 ls -lh models/ggml-mistral-7b-instruct-q4.gguf
@@ -57,24 +71,94 @@ ls -lh models/ggml-mistral-7b-instruct-q4.gguf
 
 ## 🚀 LAUNCH (Every Time)
 
-### Step 1: Activate Environment
+### Step 1: SSH into EC2
 ```bash
+ssh -i your-key.pem ec2-user@your-ec2-ip
+```
+
+### Step 2: Navigate to Project
+```bash
+cd ~/local_analytic_chatbot
 source venv/bin/activate
 ```
 
-### Step 2: Start Server
+### Step 3: Start Server (Accessible from Outside)
 ```bash
-uvicorn backend.fastapi_app:app --host 127.0.0.1 --port 8000 --reload
+uvicorn backend.fastapi_app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Expected output:
+**Expected Output:**
 ```
-INFO:     Uvicorn running on http://127.0.0.1:8000
+INFO:     Uvicorn running on http://0.0.0.0:8000
 INFO:     Application startup complete
 ```
 
-### Step 3: Open Browser
-Navigate to: **http://127.0.0.1:8000**
+### Step 4: Access from Browser
+Navigate to: **http://your-ec2-ip:8000**
+
+> **Note:** Make sure your EC2 Security Group allows inbound traffic on port 8000
+
+---
+
+## 🔒 Security Setup for Production
+
+### Allow Port 8000 in Security Group
+```bash
+# Via AWS Console:
+# 1. Go to EC2 Dashboard
+# 2. Select your instance
+# 3. Click Security Group
+# 4. Edit Inbound Rules
+# 5. Add Rule:
+#    - Type: Custom TCP
+#    - Port Range: 8000
+#    - Source: 0.0.0.0/0 (or specific IP)
+```
+
+### Run as Background Service
+```bash
+# Install screen or tmux
+sudo yum install -y screen
+
+# Start server in background
+screen -S chatbot -d -m bash -c 'cd ~/local_analytic_chatbot && source venv/bin/activate && uvicorn backend.fastapi_app:app --host 0.0.0.0 --port 8000'
+
+# Detach: Ctrl+A then D
+# Reattach: screen -r chatbot
+```
+
+### Use systemd Service (Production)
+```bash
+# Create service file
+sudo nano /etc/systemd/system/chatbot.service
+```
+
+Paste this content:
+```ini
+[Unit]
+Description=Local Analytic Chatbot
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/local_analytic_chatbot
+Environment="PATH=/home/ec2-user/local_analytic_chatbot/venv/bin"
+ExecStart=/home/ec2-user/local_analytic_chatbot/venv/bin/uvicorn backend.fastapi_app:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable chatbot
+sudo systemctl start chatbot
+sudo systemctl status chatbot
+```
 
 ---
 
@@ -92,16 +176,25 @@ Navigate to: **http://127.0.0.1:8000**
 
 ## 🔧 Common Issues & Fixes
 
+### Issue: "Permission denied" when SSHing
+**Fix:** Fix key permissions
+```bash
+chmod 400 your-key.pem
+ssh -i your-key.pem ec2-user@your-ec2-ip
+```
+
 ### Issue: "ModuleNotFoundError: No module named 'backend'"
 **Fix:** Ensure you're in project root
 ```bash
-cd /path/to/local_analytic_chatbot
+cd ~/local_analytic_chatbot
+source venv/bin/activate
 ```
 
 ### Issue: "ImportError: cannot import llama_cpp"
-**Fix:** Reinstall with Metal support
+**Fix:** Reinstall llama-cpp-python
 ```bash
-CMAKE_ARGS="-DLLAMA_METAL=on" pip install --no-binary :all: --force-reinstall llama-cpp-python
+pip uninstall -y llama-cpp-python
+pip install llama-cpp-python
 ```
 
 ### Issue: Model file not found
@@ -110,27 +203,93 @@ CMAKE_ARGS="-DLLAMA_METAL=on" pip install --no-binary :all: --force-reinstall ll
 ls -lh models/
 ```
 
-### Issue: Port 8000 in use
-**Fix:** Use different port
+### Issue: Port 8000 not accessible
+**Fix:** Check security group allows port 8000
 ```bash
-uvicorn backend.fastapi_app:app --host 127.0.0.1 --port 8001 --reload
+# Via AWS Console or check with:
+sudo lsof -i :8000
+
+# If firewall is blocking:
+sudo firewall-cmd --add-port=8000/tcp --permanent
+sudo firewall-cmd --reload
+```
+
+### Issue: Server runs but page won't load
+**Fix:** Use public IP address
+```bash
+# Get your EC2 public IP:
+curl http://169.254.169.254/latest/meta-data/public-ipv4
+
+# Then navigate to: http://<public-ip>:8000
+```
+
+### Issue: Out of memory errors
+**Fix:** Limit model or use CPU optimization
+```bash
+# Kill the app and restart with reduced model size
+# Or use a smaller model than Mistral 7B
 ```
 
 ---
 
-## 💡 Pro Tips
+## 💡 Pro Tips for EC2
 
-**One-liner launch:**
+**Quick Launch One-Liner:**
 ```bash
-source venv/bin/activate && uvicorn backend.fastapi_app:app --host 127.0.0.1 --port 8000 --reload
+cd ~/local_analytic_chatbot && source venv/bin/activate && uvicorn backend.fastapi_app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Shell alias (add to ~/.zshrc):**
-```bash
-alias launch-chatbot='cd /path/to/local_analytic_chatbot && source venv/bin/activate && uvicorn backend.fastapi_app:app --host 127.0.0.1 --port 8000 --reload'
-
-# Then just type: launch-chatbot
+**Create SSH Alias (add to ~/.ssh/config locally):**
 ```
+Host chatbot-ec2
+    HostName your-ec2-ip
+    User ec2-user
+    IdentityFile ~/path/to/your-key.pem
+```
+
+Then SSH with: `ssh chatbot-ec2`
+
+**Keep Server Running After Disconnect:**
+```bash
+# Use nohup
+nohup uvicorn backend.fastapi_app:app --host 0.0.0.0 --port 8000 > server.log 2>&1 &
+
+# Or use tmux
+tmux new-session -d -s chatbot "cd ~/local_analytic_chatbot && source venv/bin/activate && uvicorn backend.fastapi_app:app --host 0.0.0.0 --port 8000"
+```
+
+**Monitor Server Logs:**
+```bash
+tail -f server.log
+```
+
+**Check Resource Usage:**
+```bash
+# CPU and Memory
+top
+
+# Disk space
+df -h
+
+# Process status
+ps aux | grep uvicorn
+```
+
+---
+
+## 📋 EC2 Setup Checklist
+
+- [ ] SSH access working
+- [ ] System dependencies installed
+- [ ] Virtual environment created
+- [ ] All Python packages installed
+- [ ] Model downloaded to `/models/`
+- [ ] Backend directories created (__init__.py files)
+- [ ] Server starts without errors
+- [ ] Security group allows port 8000
+- [ ] Can access from http://your-ec2-ip:8000
+- [ ] Query history works
+- [ ] Cache stats showing hits
 
 ---
 
