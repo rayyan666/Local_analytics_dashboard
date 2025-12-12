@@ -1,70 +1,154 @@
-# 🚀 Quick Start - Launch in 5 Minutes
+# 🚀 Quick Start - Proven Launch Steps
 
-## Prerequisites
-- Python 3.8+
-- Git
-- ~2GB disk space for Mistral model (optional)
+## ⚙️ ONE-TIME SETUP
 
-## Step 1: Clone & Setup (1 min)
-
+### Step 1: Activate Virtual Environment
 ```bash
-# Navigate to where you want the project
-cd ~/Documents
-
-# Clone the repository
-git clone <repo-url>
-cd local_analytic_chatbot
-
-# Create virtual environment (optional but recommended)
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 ```
 
-## Step 2: Install Dependencies (2 min)
-
+### Step 2: Install System Dependencies (macOS)
 ```bash
-# Install required packages
-pip install fastapi uvicorn pandas numpy matplotlib llama-cpp-python
-
-# Or install from requirements.txt if available
-pip install -r requirements.txt
+xcode-select --install
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew update
+brew install cmake pkg-config libomp git
 ```
 
-## Step 3: Prepare Model (Optional, 1 min)
-
-The app works without a local model, but for best results:
-
+### Step 3: Upgrade Python Tools
 ```bash
-# The model should already be in: models/ggml-mistral-7b-instruct-q4.gguf
-# If not present, the app will use fallback mode
-
-# To download manually (skip if already present):
-# Download from: https://huggingface.co/TheBloke/Mistral-7B-Instruct-GGUF
-# Place in: models/ directory
+python3 -m pip install --upgrade pip setuptools wheel
 ```
 
-## Step 4: Start Backend (1 min)
-
+### Step 4: Install Build Tools
 ```bash
-# From the project root directory
-cd backend
-
-# Start the server
-python3 -m uvicorn fastapi_app:app --reload
-
-# You should see:
-# INFO:     Uvicorn running on http://127.0.0.1:8000
-# INFO:     Application startup complete
+python3 -m pip install scikit-build-core scikit-build build ninja meson-python
 ```
 
-## Step 5: Open Frontend (1 min)
-
-Open your web browser and navigate to:
+### Step 5: Install llama-cpp-python with GPU Support
+```bash
+python3 -m pip uninstall -y llama-cpp-python
+CMAKE_ARGS="-DLLAMA_METAL=on" pip install --no-binary :all: --force-reinstall llama-cpp-python
 ```
-http://localhost:8000
+
+### Step 6: Verify Installation
+```bash
+python3 -c "import numpy, llama_cpp; print('✅ All imports working!')"
 ```
 
-That's it! 🎉
+### Step 7: Create Required Directories
+```bash
+touch backend/__init__.py
+touch backend/llm_adapters/__init__.py
+touch backend/executors/__init__.py
+touch backend/reports/__init__.py
+touch backend/utils/__init__.py
+```
+
+### Step 8: Download Model (see LAUNCH.md for full instructions)
+```bash
+# Check if exists
+ls -lh models/ggml-mistral-7b-instruct-q4.gguf
+
+# Download if missing (full instructions in LAUNCH.md)
+```
+
+---
+
+## 🚀 LAUNCH (Every Time)
+
+### Step 1: Activate Environment
+```bash
+source venv/bin/activate
+```
+
+### Step 2: Start Server
+```bash
+uvicorn backend.fastapi_app:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Expected output:
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000
+INFO:     Application startup complete
+```
+
+### Step 3: Open Browser
+Navigate to: **http://127.0.0.1:8000**
+
+---
+
+## ✅ What Works After Launch
+
+- ✅ Upload CSV files
+- ✅ Ask questions about data
+- ✅ Get AI-powered analysis with charts
+- ✅ See data quality warnings
+- ✅ Use query history (save/bookmark/rerun)
+- ✅ Cache repeated queries (40-100x faster!)
+- ✅ Get smart error messages with fixes
+
+---
+
+## 🔧 Common Issues & Fixes
+
+### Issue: "ModuleNotFoundError: No module named 'backend'"
+**Fix:** Ensure you're in project root
+```bash
+cd /path/to/local_analytic_chatbot
+```
+
+### Issue: "ImportError: cannot import llama_cpp"
+**Fix:** Reinstall with Metal support
+```bash
+CMAKE_ARGS="-DLLAMA_METAL=on" pip install --no-binary :all: --force-reinstall llama-cpp-python
+```
+
+### Issue: Model file not found
+**Fix:** Download from LAUNCH.md or check:
+```bash
+ls -lh models/
+```
+
+### Issue: Port 8000 in use
+**Fix:** Use different port
+```bash
+uvicorn backend.fastapi_app:app --host 127.0.0.1 --port 8001 --reload
+```
+
+---
+
+## 💡 Pro Tips
+
+**One-liner launch:**
+```bash
+source venv/bin/activate && uvicorn backend.fastapi_app:app --host 127.0.0.1 --port 8000 --reload
+```
+
+**Shell alias (add to ~/.zshrc):**
+```bash
+alias launch-chatbot='cd /path/to/local_analytic_chatbot && source venv/bin/activate && uvicorn backend.fastapi_app:app --host 127.0.0.1 --port 8000 --reload'
+
+# Then just type: launch-chatbot
+```
+
+---
+
+## 📚 What to Do First
+
+1. ✅ Follow setup steps
+2. 📊 Upload a CSV file
+3. ❓ Ask a question
+4. 🔄 Try rerunning (see it cached!)
+5. ⭐ Bookmark a favorite query
+6. 📊 Check `/cache-stats` endpoint
+
+---
+
+**Need More Help?**
+- **LAUNCH.md** - Detailed instructions with model download
+- **SETUP_GUIDE.md** - Visual flowchart of setup
+- **IMPROVEMENTS_SUMMARY.md** - Feature overview
 
 ---
 
